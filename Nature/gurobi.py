@@ -76,20 +76,6 @@ model.addConstrs(
     name="Capacity"
 )
 
-# 网络约束
-model.addConstrs(
-    (gp.quicksum(x[i, j] for j in providers) <= 1 for i in tasks),
-    name="Network"
-)
-model.addConstrs(
-    (gp.quicksum(x[i, j] for i in tasks) <= 1 for j in providers),
-    name="Network2"
-)
-model.addConstrs(
-    (gp.quicksum(x[i, j] for i in data["edges"][k]) <= 1 for k in range(len(data["edges"]))),
-    name="Network3"
-)
-
 # 必须完成前面的任务才能做后面的
 for i in range(data["taskNum"]):
     for j in range(i + 1, data["taskNum"]):
