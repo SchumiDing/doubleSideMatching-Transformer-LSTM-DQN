@@ -73,9 +73,15 @@ class Net(nn.Module):
             nn.ReLU(),
             nn.Linear(2*provider_num*task_num,provider_num),
         )
-
+        self.derograteT = nn.Sequential(
+            nn.Linear(provider_num*task_num,2*provider_num*task_num),
+            nn.ReLU(),
+            nn.Linear(2*provider_num*task_num,2*provider_num*task_num),
+            nn.ReLU(),
+            nn.Linear(2*provider_num*task_num,task_num),
+        )
         self.decision = nn.Sequential(
-            nn.Linear(provider_num+task_num,(provider_num+task_num)*3//2),
+            nn.Linear(provider_num+task_num*2,(provider_num+task_num)*3//2),
             nn.ReLU(),
             nn.Linear((provider_num+task_num)*3//2,(provider_num+task_num)*3//2),
             nn.ReLU(),
@@ -176,15 +182,16 @@ class Net(nn.Module):
     
     def forward(self,x,pos,p,prehc):
         x = self.attention(x)
+        x_t = self.derograteT(x.flatten())
         x = self.Tattention(x)
         x = x.flatten()
         x = x.unsqueeze(0) 
         
         x = self.linear(x)
         
-        x = self.degorate(x)
+        x_p = self.degorate(x)
         
-        x = self.decision(torch.cat([x,pos],dim=1))
+        x = self.decision(torch.cat([x_p,x_p,pos],dim=1))
         
         self.hidden_state.append(None)
         self.cell_state.append(None)
