@@ -46,6 +46,26 @@ class netw:
         print(long_path)
         
         return
+    
+    def criticalpath(self, p, time): # calculate the critical path
+        pT = 0
+        if p.loc != -1:
+            if self.paths[p.loc] > time:
+                self.paths[p.loc] = time
+            # cR = (1-torch.exp(self.alpha*1)) if self.providerW[p.provider] > 1 else 1
+            # pT = self.taskTime[p.provider][p.loc]*cR
+            pT = self.taskTime[p.provider][p.loc]
+            if self.pathe[p.loc] < time+pT:
+                self.pathe[p.loc] = time+pT
+        else:
+            pT = 0
+        for c in p.children:
+            if c.finished:
+                self.criticalpath(c, time+pT)
+        if len(p.children) == 0:
+            if self.critical_path < time+pT:
+                self.critical_path = time+pT
+        return
             
         
 

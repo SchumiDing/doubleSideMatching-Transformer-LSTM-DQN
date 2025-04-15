@@ -10,7 +10,7 @@ class network(netw):
                 taskTime, rep, deadline, providerAbility,\
                 providerL, providerPrice, providerReliability,\
                     providerEnergyCost, budget, param, omega, lam):
-        super(network,self).__init__(providerN, taskN)
+        # super(network,self).__init__(providerN, taskN)
         self.device = device
         self.deadlines = deadlines
         self.budgets = budgets
@@ -34,6 +34,7 @@ class network(netw):
         self.lam = lam
         self.points = []
         self.x = torch.zeros((self.taskNum, self.providerNum)).to(self.device)
+        self.pathe = [0 for i in range(taskNum)]
     
     def init_points(self):
         for i in range(self.taskNum):
@@ -53,7 +54,7 @@ class network(netw):
         self.paths = [0 for i in range(self.taskNum)]
         return
 
-    def objv(self, x): # calculate the objective value
+    def objv(self): # calculate the objective value
         '''
         x: the final state of the network
         '''
@@ -94,9 +95,8 @@ class network(netw):
         return satisfactionS, (sat1, satisfaction-sat1)
 
 class geneticAlgorithm():
-    def __init__(self, net, taskNum, providerNum, device):
+    def __init__(self, taskNum, providerNum, device):
         self.device = device
-        self.net = net
         self.taskNum = taskNum
         self.providerNum = providerNum
         self.population = []
@@ -109,11 +109,17 @@ class geneticAlgorithm():
                      taskTime, rep, deadline, providerAbility,\
                      providerL, providerPrice, providerReliability,\
                      providerEnergyCost, budget, param, omega, lam):
-        return network(deadlines, budgets, Rs, abilities, cost,\
+        tempn = network(deadlines, budgets, Rs, abilities, cost,\
                     providerN, taskN, providerNum, taskNum, edges, device,\
                     taskTime, rep, deadline, providerAbility,\
                     providerL, providerPrice, providerReliability,\
                         providerEnergyCost, budget, param, omega, lam)
+        tempn.init_points()
+        tempn.beginning = point()
+        tempn.beginning.loc = 0
+        tempn.beginning.children = [tempn.points[0]]
+        tempn.beginning.finished = True
+        return tempn
     
     def initialize_population(self, size, deadlines, budgets, Rs, abilities, cost,\
                  providerN, taskN, providerNum, taskNum, edges, device,\
@@ -143,7 +149,7 @@ class geneticAlgorithm():
     def process(self):
         for pop in self.population:
             for p in pop.points:
-                for i,v in enumerate(self.x[p.loc]):
+                for i,v in enumerate(pop.x[p.loc]):
                     if i == p.loc:
                         continue
                     if v == 1:
@@ -162,7 +168,7 @@ class geneticAlgorithm():
         alValue = sorted(alValue, key=lambda x: x[1], reverse=True)
         selected = alValue[:self.size]
         self.population = [ind[0] for ind in selected]
-        self.bestSolution = selected[0][0]
+        self.bestSolution = selected[0][0].x
         self.bestFitness = selected[0][1]
         return self.bestSolution, self.bestFitness
     
@@ -176,16 +182,16 @@ class geneticAlgorithm():
         x1_new = torch.cat((x1[:cross_point], x2[cross_point:]), dim=0)
         x2_new = torch.cat((x2[:cross_point], x1[cross_point:]), dim=0)
 
-        child1 = self.create_individual(self.net.deadlines, self.net.budgets, self.net.Rs, self.net.abilities, self.net.cost,\
-                    self.net.providerNum, self.net.taskNum, self.net.providerNum, self.net.taskNum, self.net.edges, self.device,\
-                    self.net.taskTime, self.net.rep, self.net.deadline, self.net.providerAbility,\
-                    self.net.providerL, self.net.providerPrice, self.net.providerReliability,\
-                    self.net.providerEnergyCost, self.net.budget, self.net.param, self.net.omega, self.net.lam)
-        child2 = self.create_individual(self.net.deadlines, self.net.budgets, self.net.Rs, self.net.abilities, self.net.cost,\
-                    self.net.providerNum, self.net.taskNum, self.net.providerNum, self.net.taskNum, self.net.edges, self.device,\
-                    self.net.taskTime, self.net.rep, self.net.deadline, self.net.providerAbility,\
-                    self.net.providerL, self.net.providerPrice, self.net.providerReliability,\
-                    self.net.providerEnergyCost, self.net.budget, self.net.param, self.net.omega, self.net.lam)
+        child1 = self.create_individual(parent1.deadlines, parent1.budgets, parent1.Rs, parent1.abilities, parent1.cost,\
+                    parent1.providerNum, parent1.taskNum, parent1.providerNum, parent1.taskNum, parent1.edges, self.device,\
+                    parent1.taskTime, parent1.rep, parent1.deadline, parent1.providerAbility,\
+                    parent1.providerL, parent1.providerPrice, parent1.providerReliability,\
+                    parent1.providerEnergyCost, parent1.budget, parent1.param, parent1.omega, parent1.lam)
+        child2 = self.create_individual(parent2.deadlines, parent2.budgets, parent2.Rs, parent2.abilities, parent2.cost,\
+                    parent2.providerNum, parent2.taskNum, parent2.providerNum, parent2.taskNum, parent2.edges, self.device,\
+                    parent2.taskTime, parent2.rep, parent2.deadline, parent2.providerAbility,\
+                    parent2.providerL, parent2.providerPrice, parent2.providerReliability,\
+                    parent2.providerEnergyCost, parent2.budget, parent2.param, parent2.omega, parent2.lam)
         child1.x = x1_new
         child2.x = x2_new
         child1.init_points()
@@ -200,8 +206,14 @@ class geneticAlgorithm():
                 individual.x[i,:] = 0
                 individual.x[i, np.random.randint(0, self.providerNum)] = 1
     
+    def init(self):
+        for pop in self.population:
+            pop.init_points()
+            pop.critical_path = -1
+            pop.pathe = [0 for i in range(self.taskNum)]
     def run(self, generations):
         for generation in range(generations):
+            self.init()
             self.process()
             self.selection()
             new_population = []
@@ -209,7 +221,7 @@ class geneticAlgorithm():
                 for j in range(i , len(self.population)):
                     if i == j:
                         continue
-                    if np.random.rand() < (2 - 2^(((i+j)/2)/self.size)):
+                    if np.random.rand() < (2 - pow(2,(((i+j)/2)/self.size))):
                         parent1 = self.population[i]
                         parent2 = self.population[j]
                         child1, child2 = self.crossover(parent1, parent2)
@@ -225,7 +237,7 @@ if __name__ == "__main__":
     torch.manual_seed(4244)
     np.random.seed(4244)
     # torch.autograd.set_detect_anomaly(True)
-    det = json.load(open("smalldata.json","r"))
+    det = json.load(open("data_5_3.json","r"))
     taskN = det["taskNum"]
     providerN = det["providerNum"]
     edges = det["edges"]
@@ -254,7 +266,8 @@ if __name__ == "__main__":
     omega = [0.2, 0.2, 0.2, 0.2, 0.2]
     lam = 0.5
     
-    model = geneticAlgorithm()
+
+    model = geneticAlgorithm(taskN,providerN,device)
     
     model.initialize_population(100, deadlines, budgets, Rs, abilities, cost,\
                     providerN, taskN, providerN, taskN, edges, device,\
@@ -264,4 +277,5 @@ if __name__ == "__main__":
     
     
     model.run(100)
+    print("Best Solution: ", model.bestSolution)
     
