@@ -80,7 +80,7 @@ model.addConstrs(
 for i in range(data["taskNum"]):
     for j in range(i + 1, data["taskNum"]):
         if (i, j) in data["edges"]:
-            model.addConstr(x[i, j] <= x[j, i], name=f"Precedence_{i}_{j}")
+          model.addConstrs(sum(x[i, k] for k in providers) >= sum(x[j, k] for k in providers), name="Precedence")
 
 # ========================== 定义满意度表达式 ==========================
 # 分配部分满意度
